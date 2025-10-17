@@ -1,10 +1,10 @@
 // scraper.js
+
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 
 async function getAndSaveDefacedUrl() {
-    // headless true là đủ (khỏi "new")
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({ headless: "new" });
     const page = await browser.newPage();
 
     try {
@@ -15,53 +15,35 @@ async function getAndSaveDefacedUrl() {
         const url = 'https://www.zone-h.org/mirror/id/41471125';
         console.log(`Đang truy cập vào trang: ${url}`);
 
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto(url, { waitUntil: 'networkidle2' });
 
-        // Chờ item chứa phần "Domain:" – linh hoạt: .defaces hoặc class có chữ deface
-        await page.waitForSelector('li.defaces, li[class*=deface]', { timeout: 15000 });
+        const xpathSelector = "//li[contains(., 'Domain:')]";
+        console.log(`Đang chờ selector XPath "${xpathSelector}"...`);
 
-        // Lấy text từ các <li> rồi bóc riêng URL sau "Domain:"
-        const extractedText = await page.evaluate(() => {
-            // Ưu tiên: <strong>Domain:</strong><text-sau-đó>
-            const nodes = Array.from(document.querySelectorAll('li.defaces, li[class*="deface"]'));
-            for (const li of nodes) {
-                const strong = li.querySelector('strong');
-                if (strong && /Domain:?/i.test(strong.textContent)) {
-                    // gom text sau <strong>Domain:</strong>
-                    let acc = '';
-                    for (let n = strong.nextSibling; n; n = n.nextSibling) {
-                        if (n.nodeType === Node.TEXT_NODE) acc += n.nodeValue;
-                        else if (n.nodeType === Node.ELEMENT_NODE) acc += ' ' + n.textContent;
-                    }
-                    return acc.trim();
-                }
-            }
-            // Fallback: nếu không có <strong>, lấy toàn bộ text của <li> có chữ Domain:
-            const fallback = nodes.find(li => /Domain:/i.test(li.textContent));
-            return fallback ? fallback.textContent : null;
-        });
+        await page.waitForSelector(`xpath/${xpathSelector}`);
 
-        if (!extractedText) {
-            console.log('Không tìm thấy đoạn text chứa "Domain:".');
-            return;
+        const extractedText = await page.evaluate((xpath) => {
+            const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            return result.singleNodeValue ? result.singleNodeValue.textContent : null;
+        }, xpathSelector);
+
+        if (extractedText) {
+            // THAY ĐỔI DUY NHẤT NẰM Ở ĐÂY
+            const defacedUrl = extractedText.split('Domain:')[1].split('IP address:')[0].trim();
+
+            fs.appendFileSync('urls.txt', defacedUrl + '\n');
+
+            console.log(`✅ THÀNH CÔNG! Đã lưu URL sạch: ${defacedUrl} vào tệp urls.txt`);
+        } else {
+            console.log('Không tìm thấy element nào khớp.');
         }
 
-        // CHỈ lấy URL bằng regex (loại bỏ IP address và text khác)
-        const urlMatch = extractedText.match(/https?:\/\/[^\s"'<>]+/i);
-        if (!urlMatch) {
-            console.log('Không bắt được URL trong chuỗi:', extractedText);
-            return;
-        }
-
-        // Làm sạch dấu câu ở cuối nếu có
-        const defacedUrl = urlMatch[0].replace(/[),.;]+$/, '').trim();
-
-        fs.appendFileSync('urls.txt', defacedUrl + '\n', { encoding: 'utf8' });
-        console.log(`✅ THÀNH CÔNG! Đã lưu URL: ${defacedUrl} vào tệp urls.txt`);
     } catch (error) {
         console.error('Đã xảy ra lỗi:', error);
     } finally {
-        await browser.close();
+        if (browser) {
+            await browser.close();
+        }
     }
 }
 
