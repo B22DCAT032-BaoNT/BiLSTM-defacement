@@ -10,11 +10,11 @@ async function getAndSaveDefacedUrls() {
         await page.setUserAgent(
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
         );
-
-        if (fs.existsSync('urls.txt')) {
-            console.log('📄 Phát hiện tệp urls.txt — sẽ ghi nối tiếp kết quả vào cuối tệp hiện có.');
+        const OUTPUT_FILE = 'defacement_url.txt';
+        if (fs.existsSync(OUTPUT_FILE)) {
+            console.log(`📄 Phát hiện tệp ${OUTPUT_FILE} — sẽ ghi nối tiếp kết quả vào cuối tệp hiện có.`);
         } else {
-            console.log('🆕 Chưa có tệp urls.txt — sẽ tạo mới.');
+            console.log(`🆕 Chưa có tệp ${OUTPUT_FILE} — sẽ tạo mới.`);
         }
 
         for (let attempt = 41471240; attempt > 41471240 - 1000; attempt--) { // Vòng lặp
@@ -38,7 +38,7 @@ async function getAndSaveDefacedUrls() {
 
                 if (extractedText) {
                     const defacedUrl = extractedText.split('Domain:')[1].split('IP address:')[0].trim();
-                    fs.appendFileSync('urls.txt', defacedUrl + '\n');
+                    fs.appendFileSync(OUTPUT_FILE, defacedUrl + '\n');
                     console.log(`✅ Đã lưu Domain: ${defacedUrl} \n`);
                 }
             } catch (error) {
