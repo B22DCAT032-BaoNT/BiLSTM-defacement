@@ -1,64 +1,64 @@
-// scraper.js
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 
 async function getAndSaveDefacedUrls() {
-    const browser = await puppeteer.launch({ headless: "new" });
+    const browser = await puppeteer.launch({
+        headless: false,
+        slowMo: 50,
+        defaultViewport: null,
+        args: ['--start-maximized']
+    });
+
     const page = await browser.newPage();
+    const OUTPUT_FILE = 'defacement_url.txt';
 
-    try {
-        await page.setUserAgent(
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-        );
-        const OUTPUT_FILE = 'defacement_url.txt';
-        if (fs.existsSync(OUTPUT_FILE)) {
-            console.log(`📄 Phát hiện tệp ${OUTPUT_FILE} — sẽ ghi nối tiếp kết quả vào cuối tệp hiện có.`);
-        } else {
-            console.log(`🆕 Chưa có tệp ${OUTPUT_FILE} — sẽ tạo mới.`);
-        }
+    if (fs.existsSync(OUTPUT_FILE)) {
+        console.log(`📄 Tìm thấy ${OUTPUT_FILE}, sẽ ghi nối tiếp.`);
+    } else {
+        console.log(`🆕 Tạo mới tệp ${OUTPUT_FILE}.`);
+    }
 
-        for (let attempt = 41471240; attempt > 41471240 - 1000; attempt--) { // Vòng lặp
+    for (let attempt = 41471031; attempt > 41471031 - 1000; attempt--) {
+        const url = `https://www.zone-h.org/mirror/id/${attempt}`;
+        console.log(`🟢 Truy cập: ${url}`);
 
-            try {
-                const url = `https://www.zone-h.org/mirror/id/${attempt}`;
-                console.log(`--- Đang xử lý url: ${url} ---`);
+        try {
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
-                await page.goto(url, { waitUntil: 'networkidle2' });
-
-                const xpathSelector = "//li[contains(., 'Domain:')]";
-
-                //Thêm timeout: 3000 (3 giây)
-                await page.waitForSelector(`xpath/${xpathSelector}`, { timeout: 3000 });
-
-                // Nếu không có lỗi timeout, code bên dưới sẽ được thực thi
-                const extractedText = await page.evaluate((xpath) => {
-                    const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-                    return result.singleNodeValue ? result.singleNodeValue.textContent : null;
-                }, xpathSelector);
-
-                if (extractedText) {
-                    const defacedUrl = extractedText.split('Domain:')[1].split('IP address:')[0].trim();
-                    fs.appendFileSync(OUTPUT_FILE, defacedUrl + '\n');
-                    console.log(`✅ Đã lưu Domain: ${defacedUrl} \n`);
-                }
-            } catch (error) {
-                // Nếu có lỗi thông báo và bỏ qua
-                if (error.name === 'TimeoutError') {
-                    console.log(`🟡 Bỏ qua ID ${attempt} do hết thời gian chờ (3s).`);
-                } else {
-                    console.error(`❌ Lỗi không xác định với ID ${attempt}: ${error.message}`);
-                }
-                // Vòng lặp sẽ tự động chuyển sang ID tiếp theo
+            // 1. Kiểm tra xem có captcha không
+            const isCaptcha = await page.$('img[src*="captcha"]');
+            if (isCaptcha) {
+                console.log('🛑 Phát hiện CAPTCHA — vui lòng nhập tay và nhấn "Gửi" trong trình duyệt.');
+                await page.waitForFunction(
+                    () => !document.querySelector('img[src*="captcha"]'),
+                    { timeout: 120000 } // chờ tối đa 2 phút
+                );
+                console.log('✅ CAPTCHA đã qua — tiếp tục thu thập dữ liệu...');
             }
-        }
-    } catch (error) {
-        console.error('Đã xảy ra lỗi nghiêm trọng:', error);
-    } finally {
-        console.log('🎉 Hoàn tất quá trình quét!');
-        if (browser) {
-            await browser.close();
+
+            // 2. Trích thông tin từ mirror nếu captcha đã vượt
+            const domainText = await page.evaluate(() => {
+                const el = [...document.querySelectorAll("li")].find(e =>
+                    e.textContent.includes("Domain:")
+                );
+                return el ? el.textContent : null;
+            });
+
+            if (domainText) {
+                const extracted = domainText.split('Domain:')[1].split('IP address:')[0].trim();
+                fs.appendFileSync(OUTPUT_FILE, extracted + '\n');
+                console.log(`✅ Đã lưu: ${extracted}\n`);
+            } else {
+                console.log('⚠️ Không tìm thấy domain trong trang.');
+            }
+
+        } catch (err) {
+            console.log(`❌ Lỗi với ID ${attempt}: ${err.message}`);
         }
     }
+
+    await browser.close();
+    console.log('🎉 Quét hoàn tất!');
 }
 
 getAndSaveDefacedUrls();

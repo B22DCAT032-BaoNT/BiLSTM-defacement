@@ -28,7 +28,7 @@ async function getAndSaveDefacedUrl() {
         }, xpathSelector);
 
         if (extractedText) {
-            // THAY ĐỔI DUY NHẤT NẰM Ở ĐÂY
+
             const defacedUrl = extractedText.split('Domain:')[1].split('IP address:')[0].trim();
 
             fs.appendFileSync('urls.txt', defacedUrl + '\n');
